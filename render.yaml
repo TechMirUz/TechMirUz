@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: techmir-pos
+    runtime: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --bind 0.0.0.0:$PORT --workers 1 --threads 4
+    disk:
+      name: techmir-pos-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: POS_DB_PATH
+        value: /var/data/techmir_pos.sqlite3
+      - key: POS_PASSWORD
+        sync: false
+      - key: SECRET_KEY
+        generateValue: true
+      - key: COOKIE_SECURE
+        value: "1"
