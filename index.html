@@ -806,11 +806,7 @@
             }, 1000);
         }
 
-        function saveData() {
-            localStorage.setItem('techmir_products', JSON.stringify(state.products));
-            localStorage.setItem('techmir_sales', JSON.stringify(state.sales));
-            localStorage.setItem('techmir_settings', JSON.stringify(state.settings));
-        }
+        // Removed the old local-only saveData override. All saves now go to the shared server database.
 
         function switchTab(tabId) {
             document.querySelectorAll('main > section').forEach(sec => sec.classList.add('hidden'));
