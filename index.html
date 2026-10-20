@@ -86,6 +86,33 @@
             #printable-receipt th:last-child, #printable-receipt td:last-child { width: 36% !important; }
             .no-print { display: none !important; }
         }
+
+        /* Mobil telefon uchun qulay ko‘rinish */
+        @media (max-width: 768px) {
+            html, body { height: 100%; min-height: 100%; }
+            body { overflow: auto !important; }
+            header { padding: 8px 10px !important; gap: 8px; flex-wrap: wrap; }
+            header > div { min-width: 0; }
+            header .flex.items-center.space-x-6 { gap: 8px !important; }
+            header nav { max-width: 100%; overflow-x: auto; }
+            main { min-height: 0; overflow: auto !important; }
+            #view-pos { height: auto !important; min-height: calc(100dvh - 70px); overflow: visible !important; display: flex; flex-direction: column !important; }
+            #view-pos > * { min-width: 0; width: 100%; }
+            #view-products, #view-sales, #view-analytics, #view-settings { height: auto !important; min-height: calc(100dvh - 70px); padding: 10px !important; overflow: visible !important; }
+            #view-products .grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+            #view-products input, #view-sales input, #view-settings input, #view-settings select { min-height: 42px; font-size: 16px; }
+            #view-settings .flex.justify-between { align-items: stretch; flex-direction: column; gap: 10px; }
+            #view-settings button { width: 100%; min-height: 44px; }
+            #login-screen form { padding: 22px !important; }
+            #login-password { font-size: 16px; min-height: 46px; }
+            #modal-checkout, #modal-receipt, [id^="modal-"] { padding: 8px !important; align-items: flex-start; overflow-y: auto; }
+            [id^="modal-"] > div { max-height: calc(100dvh - 16px); overflow-y: auto; width: 100%; }
+            button { touch-action: manipulation; }
+        }
+        @media (max-width: 420px) {
+            #view-products .grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+            .text-2xl { font-size: 1.25rem !important; }
+        }
     </style>
 </head>
 
@@ -481,6 +508,18 @@
                             <label class="block font-bold text-slate-600 dark:text-slate-300 mb-1">Standart QQS Soliq Stavkasi (%)</label>
                             <input type="number" id="setting-default-tax" value="0" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl font-bold">
                         </div>
+                    </div>
+
+                    <div class="mt-5 pt-4 border-t border-slate-200 dark:border-slate-800 space-y-3">
+                        <h3 class="font-extrabold text-sm">Kirish parolini almashtirish</h3>
+                        <p class="text-xs text-slate-500">Yangi parol serverda saqlanadi. Joriy parolni tasdiqlash talab qilinadi.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
+                            <input id="password-current" type="password" autocomplete="current-password" placeholder="Joriy parol" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl">
+                            <input id="password-new" type="password" autocomplete="new-password" placeholder="Yangi parol (kamida 6 belgi)" minlength="6" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl">
+                            <input id="password-confirm" type="password" autocomplete="new-password" placeholder="Yangi parolni takrorlang" minlength="6" class="w-full px-3 py-2 bg-slate-100 dark:bg-slate-800 border border-slate-300 dark:border-slate-700 rounded-xl">
+                        </div>
+                        <button type="button" onclick="changePOSPassword()" class="w-full md:w-auto px-5 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-extrabold text-xs">Parolni almashtirish</button>
+                        <p id="password-change-message" class="text-sm hidden" role="status"></p>
                     </div>
 
                     <div class="pt-3 border-t border-slate-200 dark:border-slate-800 flex justify-between items-center">
@@ -1350,6 +1389,49 @@
             }
 
             openModal('modal-product');
+        }
+
+
+        async function changePOSPassword() {
+            const currentPassword = document.getElementById('password-current').value;
+            const newPassword = document.getElementById('password-new').value;
+            const confirmPassword = document.getElementById('password-confirm').value;
+            const message = document.getElementById('password-change-message');
+            const showMessage = (text, success=false) => {
+                message.textContent = text;
+                message.classList.remove('hidden', 'text-rose-600', 'text-emerald-600');
+                message.classList.add(success ? 'text-emerald-600' : 'text-rose-600');
+            };
+            if (!currentPassword || !newPassword || !confirmPassword) {
+                showMessage('Barcha parol maydonlarini to‘ldiring.'); return;
+            }
+            if (newPassword.length < 6) {
+                showMessage('Yangi parol kamida 6 ta belgidan iborat bo‘lsin.'); return;
+            }
+            if (newPassword !== confirmPassword) {
+                showMessage('Yangi parollar bir xil emas.'); return;
+            }
+            if (currentPassword === newPassword) {
+                showMessage('Yangi parol joriy paroldan farq qilishi kerak.'); return;
+            }
+            try {
+                const response = await fetch('/api/change-password', {
+                    method: 'POST', credentials: 'same-origin',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({current_password: currentPassword, new_password: newPassword})
+                });
+                const data = await response.json().catch(() => ({}));
+                if (!response.ok) {
+                    showMessage(data.error || (response.status === 404
+                        ? 'Serverda parol almashtirish API yo‘q. app.py fayliga ham endpoint qo‘shish kerak.'
+                        : 'Parol almashtirilmadi. Joriy parolni tekshiring.'));
+                    return;
+                }
+                showMessage(data.message || 'Parol muvaffaqiyatli almashtirildi.', true);
+                ['password-current','password-new','password-confirm'].forEach(id => document.getElementById(id).value = '');
+            } catch (e) {
+                showMessage('Server bilan bog‘lanib bo‘lmadi. Internetni tekshiring.');
+            }
         }
 
         async function loginPOS(event) {
