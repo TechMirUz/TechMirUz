@@ -7,7 +7,7 @@ from werkzeug.middleware.proxy_fix import ProxyFix
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("POS_DB_PATH", os.path.join(BASE_DIR, "techmir_pos.sqlite3"))
-POS_PASSWORD = os.environ.get("POS_PASSWORD", "7484")
+POS_PASSWORD = os.environ.get("POS_PASSWORD", "Asqar-7484")
 SECRET_KEY = os.environ.get("SECRET_KEY", "change-this-secret-before-deploying")
 
 app = Flask(__name__, static_folder=None)
