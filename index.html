@@ -113,6 +113,52 @@
             #view-products .grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
             .text-2xl { font-size: 1.25rem !important; }
         }
+
+        /* Telefon uchun qo'shimcha moslashuv: kassa vertikal, tugmalar katta */
+        @media (max-width: 768px) {
+            html, body { width: 100%; max-width: 100%; overflow-x: hidden !important; }
+            body { min-height: 100dvh; height: auto !important; }
+            header { align-items: flex-start !important; padding: 8px !important; }
+            header > div:first-child { width: 100%; flex-wrap: wrap !important; gap: 8px !important; }
+            header nav.hidden.md\:flex, header nav { display: flex !important; width: 100%; max-width: 100%; overflow-x: auto; flex-wrap: nowrap !important; gap: 4px !important; }
+            header nav button { flex: 0 0 auto; min-height: 42px; padding: 8px 10px !important; white-space: nowrap; }
+            header > div:last-child { width: 100%; display: flex; flex-wrap: wrap; gap: 6px !important; }
+            header > div:last-child > * { max-width: 100%; }
+            main { overflow: visible !important; min-height: 0; }
+            #view-pos { height: auto !important; min-height: 0; overflow: visible !important; display: flex !important; flex-direction: column !important; }
+            #view-pos > div:first-child { height: auto !important; min-height: 360px; overflow: visible !important; border-right: 0 !important; }
+            #pos-search { font-size: 16px !important; min-height: 44px; }
+            #pos-product-grid { display: grid !important; grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; overflow: visible !important; padding: 8px !important; }
+            #pos-product-grid > * { min-width: 0; max-width: 100%; }
+            #view-pos > div:last-child { width: 100% !important; max-width: 100% !important; height: auto !important; min-height: 360px; overflow: visible !important; border-left: 0 !important; }
+            #cart-items-container { min-height: 90px; max-height: 32dvh; overflow-y: auto !important; }
+            #view-pos button, #view-products button, #view-sales button, #view-settings button { touch-action: manipulation; }
+            #view-pos input, #view-pos select, #view-products input, #view-sales input, #view-settings input, #view-settings select, textarea { font-size: 16px !important; }
+            #view-products, #view-sales, #view-analytics, #view-settings { height: auto !important; min-height: 0 !important; max-height: none !important; overflow: visible !important; padding: 12px !important; }
+            #view-products .grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; gap: 8px !important; }
+            #view-settings .flex.justify-between { align-items: stretch; flex-direction: column; gap: 10px; }
+            #view-settings input, #view-settings select, #view-settings button { width: 100%; min-height: 44px; }
+            [id^="modal-"] { padding: 8px !important; overflow-y: auto !important; }
+            [id^="modal-"] > div { width: 100% !important; max-width: 100% !important; max-height: calc(100dvh - 16px) !important; overflow-y: auto !important; }
+        }
+        @media (max-width: 420px) {
+            #pos-product-grid { grid-template-columns: repeat(2, minmax(0, 1fr)) !important; }
+            #view-pos > div:last-child > div:last-child { padding: 10px !important; }
+            #view-pos > div:last-child > div:last-child button { min-height: 44px; padding: 10px 6px !important; }
+            #login-screen form { padding: 22px !important; }
+        }
+
+        /* FIX: telefon ekranida ham barcha asosiy menyular ko'rinsin */
+        @media (max-width: 768px) {
+            header { display: flex !important; flex-direction: column !important; align-items: stretch !important; }
+            header > div:first-child { display: flex !important; flex-direction: column !important; align-items: stretch !important; width: 100% !important; }
+            header > div:first-child > div:first-child { width: 100% !important; }
+            #main-tab-navigation { display: flex !important; visibility: visible !important; opacity: 1 !important; width: 100% !important; max-width: 100% !important; overflow-x: auto !important; overflow-y: hidden !important; flex-wrap: nowrap !important; -webkit-overflow-scrolling: touch; scrollbar-width: thin; }
+            #main-tab-navigation .tab-btn { display: inline-flex !important; flex: 0 0 auto !important; min-width: max-content !important; min-height: 42px !important; padding: 8px 11px !important; white-space: nowrap !important; font-size: 12px !important; }
+            #main-tab-navigation .tab-btn span { display: inline !important; }
+            header > div:last-child { display: flex !important; flex-direction: row !important; align-items: center !important; width: 100% !important; }
+        }
+
     </style>
 </head>
 
@@ -149,7 +195,7 @@
             </div>
 
             <!-- Tab Buttons -->
-            <nav class="hidden md:flex space-x-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl text-xs font-bold">
+            <nav id="main-tab-navigation" class="flex space-x-1 bg-slate-100 dark:bg-slate-800/60 p-1 rounded-xl text-xs font-bold">
                 <button onclick="switchTab('pos')" id="tab-btn-pos" class="tab-btn flex items-center space-x-2 px-3.5 py-1.5 rounded-lg transition-all bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 shadow-xs">
                     <i data-lucide="layout-grid" class="w-4 h-4"></i>
                     <span>Kassa (POS)</span>
