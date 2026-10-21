@@ -4,6 +4,7 @@ import sqlite3
 from functools import wraps
 from flask import Flask, request, jsonify, session, send_from_directory
 from werkzeug.middleware.proxy_fix import ProxyFix
+from werkzeug.security import generate_password_hash, check_password_hash
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DB_PATH = os.environ.get("POS_DB_PATH", os.path.join(BASE_DIR, "techmir_pos.sqlite3"))
@@ -31,6 +32,12 @@ def init_db():
     with db_connect() as con:
         con.execute("CREATE TABLE IF NOT EXISTS app_state (id INTEGER PRIMARY KEY CHECK(id=1), products TEXT, sales TEXT, settings TEXT, updated_at TEXT DEFAULT CURRENT_TIMESTAMP)")
         con.execute("INSERT OR IGNORE INTO app_state (id, products, sales, settings) VALUES (1, NULL, NULL, NULL)")
+        con.execute("CREATE TABLE IF NOT EXISTS app_auth (id INTEGER PRIMARY KEY CHECK(id=1), password_hash TEXT NOT NULL)")
+        # Birinchi ishga tushishda joriy POS_PASSWORD qiymatini boshlang'ich parol sifatida saqlaydi.
+        con.execute(
+            "INSERT OR IGNORE INTO app_auth (id, password_hash) VALUES (1, ?)",
+            (generate_password_hash(POS_PASSWORD),)
+        )
 
 
 def login_required(fn):
@@ -44,7 +51,7 @@ def login_required(fn):
 
 @app.get("/")
 def index():
-    return send_from_directory(BASE_DIR, "index.html")
+    return send_from_directory(BASE_DIR, "TechMirUz_telefon_menyu_toliq.html")
 
 
 @app.get("/health")
@@ -55,12 +62,38 @@ def health():
 @app.post("/api/login")
 def login():
     data = request.get_json(silent=True) or {}
-    if str(data.get("password", "")) != POS_PASSWORD:
+    with db_connect() as con:
+        row = con.execute("SELECT password_hash FROM app_auth WHERE id=1").fetchone()
+    if not row or not check_password_hash(row["password_hash"], str(data.get("password", ""))):
         return jsonify({"error": "invalid_password"}), 401
     session.clear()
     session["authenticated"] = True
     return jsonify({"ok": True})
 
+
+
+@app.post("/api/change-password")
+@login_required
+def change_password():
+    data = request.get_json(silent=True) or {}
+    current_password = str(data.get("current_password", ""))
+    new_password = str(data.get("new_password", ""))
+
+    if len(new_password) < 6:
+        return jsonify({"error": "Yangi parol kamida 6 ta belgidan iborat bo‘lsin."}), 400
+    if current_password == new_password:
+        return jsonify({"error": "Yangi parol joriy paroldan farq qilishi kerak."}), 400
+
+    with db_connect() as con:
+        row = con.execute("SELECT password_hash FROM app_auth WHERE id=1").fetchone()
+        if not row or not check_password_hash(row["password_hash"], current_password):
+            return jsonify({"error": "Joriy parol noto‘g‘ri."}), 401
+        con.execute(
+            "UPDATE app_auth SET password_hash=? WHERE id=1",
+            (generate_password_hash(new_password),)
+        )
+
+    return jsonify({"ok": True, "message": "Parol muvaffaqiyatli almashtirildi."})
 
 @app.post("/api/logout")
 def logout():
