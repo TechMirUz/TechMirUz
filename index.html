@@ -621,13 +621,21 @@
                     </div>
                 </div>
 
+                <div id="payme-qr-box" class="hidden text-center space-y-3 rounded-2xl border border-cyan-200 bg-cyan-50 dark:bg-cyan-950/30 dark:border-cyan-900 p-4">
+                    <p class="font-extrabold text-sm">Payme QR orqali to‘lov</p>
+                    <img id="payme-qr-image" alt="Payme to‘lov QR kodi" class="mx-auto w-52 h-52 bg-white p-2 rounded-xl" />
+                    <p id="payme-status-text" class="text-xs font-bold text-slate-600 dark:text-slate-300">To‘lov kutilmoqda...</p>
+                    <a id="payme-open-link" href="#" target="_blank" rel="noopener noreferrer" class="inline-block text-sm font-bold text-cyan-700 underline">Payme sahifasini ochish</a>
+                    <p class="text-[11px] text-slate-500">QR-kodni Payme ilovasida skanerlang va to‘lovni tasdiqlang. Chek faqat Payme tasdiqlagandan keyin chiqariladi.</p>
+                </div>
+
                 <div class="pt-2 flex space-x-2">
                     <button onclick="closeModal('modal-checkout')" class="flex-1 py-2.5 bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 font-bold text-xs rounded-xl transition">
                         Bekor qilish
                     </button>
-                    <button onclick="processFinalPayment()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-2">
+                    <button id="checkout-pay-button" onclick="processFinalPayment()" class="flex-1 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs rounded-xl shadow-md transition flex items-center justify-center space-x-2">
                         <i data-lucide="printer" class="w-4 h-4"></i>
-                        <span>To'lash va Chek</span>
+                        <span id="checkout-pay-button-label">To'lash va Chek</span>
                     </button>
                 </div>
             </div>
@@ -808,7 +816,9 @@
             cart: [],
             selectedCategory: 'all',
             activePaymentMethod: 'naqd',
-            salesChartInstance: null
+            salesChartInstance: null,
+            pendingPaymeOrder: null,
+            paymePollRunning: false
         };
 
         // App Initialization: data is loaded from the shared server database after login.
@@ -1198,15 +1208,21 @@
             document.getElementById('checkout-modal-total').innerText = formatMoney(totals.grandTotal);
 
             const cashBox = document.getElementById('cash-calculator-box');
+            const paymeBox = document.getElementById('payme-qr-box');
+            const payButtonLabel = document.getElementById('checkout-pay-button-label');
+            paymeBox.classList.add('hidden');
+            document.getElementById('payme-status-text').innerText = 'To‘lov kutilmoqda...';
             if (paymentMethod === 'naqd') {
                 cashBox.classList.remove('hidden');
                 document.getElementById('cash-given-input').value = totals.grandTotal;
                 generateQuickCashChips(totals.grandTotal);
                 calculateChange();
+                payButtonLabel.innerText = 'To‘lash va Chek';
             } else {
                 cashBox.classList.add('hidden');
+                payButtonLabel.innerText = paymentMethod === 'payme' ? 'QR-kod yaratish' : 'To‘lash va Chek';
             }
-
+            state.pendingPaymeOrder = null;
             openModal('modal-checkout');
         }
 
@@ -1248,7 +1264,95 @@
             }
         }
 
-        function processFinalPayment() {
+        async function processFinalPayment() {
+            if (state.activePaymentMethod === 'payme') {
+                if (state.pendingPaymeOrder) {
+                    checkPaymeStatus(state.pendingPaymeOrder);
+                    return;
+                }
+                const totals = updateCartTotals();
+                if (!Number.isFinite(totals.grandTotal) || totals.grandTotal <= 0) {
+                    showToast("To‘lov summasi 0 dan katta bo‘lishi kerak", "warning");
+                    return;
+                }
+                const button = document.getElementById('checkout-pay-button');
+                button.disabled = true;
+                document.getElementById('checkout-pay-button-label').innerText = 'QR yaratilmoqda...';
+                try {
+                    const response = await fetch('/api/payme/create', {
+                        method: 'POST', credentials: 'same-origin',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({amount_sum: Math.round(totals.grandTotal)})
+                    });
+                    const data = await response.json();
+                    if (!response.ok) throw new Error(data.message || data.error || 'Payme buyurtmasi yaratilmadi');
+                    state.pendingPaymeOrder = data.order_id;
+                    document.getElementById('payme-qr-image').src = data.qr_data_uri;
+                    document.getElementById('payme-open-link').href = data.checkout_url;
+                    document.getElementById('payme-qr-box').classList.remove('hidden');
+                    document.getElementById('payme-status-text').innerText = 'To‘lov kutilmoqda...';
+                    document.getElementById('checkout-pay-button-label').innerText = 'To‘lovni tekshirish';
+                    state.paymePollRunning = false;
+                    pollPaymeStatus(data.order_id);
+                } catch (error) {
+                    showToast(error.message || 'Payme bilan bog‘lanib bo‘lmadi', 'error');
+                    document.getElementById('checkout-pay-button-label').innerText = 'QR-kod yaratish';
+                } finally {
+                    button.disabled = false;
+                }
+                return;
+            }
+            finalizePaidSale();
+        }
+
+        async function pollPaymeStatus(orderId) {
+            if (state.paymePollRunning) return;
+            state.paymePollRunning = true;
+            const started = Date.now();
+            try {
+                while (state.pendingPaymeOrder === orderId && Date.now() - started < 30 * 60 * 1000) {
+                    await new Promise(resolve => setTimeout(resolve, 3000));
+                    const response = await fetch('/api/payme/status?order_id=' + encodeURIComponent(orderId), {credentials: 'same-origin'});
+                    if (!response.ok) continue;
+                    const data = await response.json();
+                    if (data.status === 'paid') {
+                        document.getElementById('payme-status-text').innerText = 'To‘lov tasdiqlandi!';
+                        state.pendingPaymeOrder = null;
+                        state.paymePollRunning = false;
+                        finalizePaidSale();
+                        return;
+                    }
+                    if (['declined', 'expired', 'reversed'].includes(data.status)) {
+                        document.getElementById('payme-status-text').innerText = 'To‘lov amalga oshmadi: ' + data.status;
+                        state.pendingPaymeOrder = null;
+                        document.getElementById('checkout-pay-button-label').innerText = 'Yangi QR yaratish';
+                        break;
+                    }
+                }
+            } catch (error) {
+                console.error('Payme status check failed', error);
+            } finally {
+                state.paymePollRunning = false;
+            }
+        }
+
+        async function checkPaymeStatus(orderId) {
+            try {
+                const response = await fetch('/api/payme/status?order_id=' + encodeURIComponent(orderId), {credentials: 'same-origin'});
+                const data = await response.json();
+                if (data.status === 'paid') {
+                    state.pendingPaymeOrder = null;
+                    finalizePaidSale();
+                } else {
+                    document.getElementById('payme-status-text').innerText = 'To‘lov hali tasdiqlanmadi. Payme ilovasida yakunlang.';
+                    pollPaymeStatus(orderId);
+                }
+            } catch (_) {
+                showToast('To‘lov holatini tekshirib bo‘lmadi', 'warning');
+            }
+        }
+
+        function finalizePaidSale() {
             const totals = updateCartTotals();
             const cashierName = document.getElementById('cashier-select').value;
 
