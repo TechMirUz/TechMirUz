@@ -851,7 +851,20 @@
                 const data = await response.json();
                 if (!data.products) {
                     if (seedIfEmpty) {
-                        await fetch('/api/state', { method: 'POST', credentials: 'same-origin', headers: {'Content-Type':'application/json'}, body: JSON.stringify({products:state.products, sales:state.sales, settings:state.settings}) });
+                        const saveResponse = await fetch('/api/state', {
+                            method: 'POST',
+                            credentials: 'same-origin',
+                            headers: {'Content-Type':'application/json'},
+                            body: JSON.stringify({
+                                products: state.products,
+                                sales: state.sales,
+                                settings: state.settings
+                            })
+                        });
+                        if (!saveResponse.ok) {
+                            showToast('Boshlang‘ich ma’lumotlar serverga saqlanmadi.', 'error');
+                            return false;
+                        }
                     }
                 } else {
                     state.products = data.products;
@@ -1869,12 +1882,35 @@
             showToast("Sozlamalar saqlandi", "success");
         }
 
-        function resetApplicationData() {
-            if (confirm("Barcha ma'lumotlar dastlabki holatiga qaytarilsinmi?")) {
-                localStorage.removeItem('techmir_products');
-                localStorage.removeItem('techmir_sales');
-                localStorage.removeItem('techmir_settings');
-                location.reload();
+        async function resetApplicationData() {
+            if (!confirm("Barcha mahsulotlar va savdo tarixi dastlabki holatga qaytarilsinmi? Bu amal barcha kassirlarga ta'sir qiladi.")) return;
+            state.products = [...DEFAULT_PRODUCTS];
+            state.sales = [...DEFAULT_SALES];
+            state.settings = {
+                storeName: "Aksessuar mir.0707",
+                storeAddress: "Qashqadaryo v. Shahrisabz sh. Koreya b/u zapchast yonida, Tel: +998 90 425-06-76",
+                defaultTax: 0
+            };
+            try {
+                const response = await fetch('/api/state', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({
+                        products: state.products,
+                        sales: state.sales,
+                        settings: state.settings
+                    })
+                });
+                if (!response.ok) throw new Error('Server save failed');
+                localStorage.setItem('techmir_products', JSON.stringify(state.products));
+                localStorage.setItem('techmir_sales', JSON.stringify(state.sales));
+                localStorage.setItem('techmir_settings', JSON.stringify(state.settings));
+                applySavedSettings();
+                renderAllPOS();
+                showToast("Ma'lumotlar barcha kassirlar uchun qayta tiklandi.", "success");
+            } catch (e) {
+                showToast("Ma'lumotlar serverga saqlanmadi. Ulanishni tekshiring.", "error");
             }
         }
 
