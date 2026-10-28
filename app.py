@@ -37,6 +37,8 @@ app.config.update(
 
 
 def db_connect():
+    db_dir = os.path.dirname(os.path.abspath(DB_PATH))
+    os.makedirs(db_dir, exist_ok=True)
     con = sqlite3.connect(DB_PATH, timeout=20)
     con.row_factory = sqlite3.Row
     return con
@@ -74,7 +76,24 @@ def login_required(fn):
 
 @app.get("/")
 def index():
-    return send_from_directory(BASE_DIR, "index.html")
+    # Render/GitHub uchun asosiy fayl nomi index.html.
+    # Zaxira nomlar eski deploylarda ham 404 bo‘lishining oldini oladi.
+    for filename in ("index.html", "index(2).html", "TechMirUz_telefon_menyu_toliq.html",
+                     "TechMirUz_telefon_menyu_toliq(1).html"):
+        if os.path.isfile(os.path.join(BASE_DIR, filename)):
+            return send_from_directory(BASE_DIR, filename)
+    app.logger.error("HTML bosh sahifa topilmadi. BASE_DIR=%s, files=%s",
+                     BASE_DIR, os.listdir(BASE_DIR))
+    return jsonify({
+        "error": "html_not_found",
+        "message": "index.html faylini app.py bilan bir papkaga joylashtiring."
+    }), 500
+
+
+@app.get("/favicon.ico")
+def favicon():
+    # Favicon yo‘qligi sahifa ishlashiga ta'sir qilmasin.
+    return "", 204
 
 
 @app.get("/health")
@@ -102,8 +121,8 @@ def change_password():
     current_password = str(data.get("current_password", ""))
     new_password = str(data.get("new_password", ""))
 
-    if len(new_password) < 1:
-        return jsonify({"error": "Yangi parol kamida 1 ta belgidan iborat bo‘lsin."}), 400
+    if len(new_password) < 6:
+        return jsonify({"error": "Yangi parol kamida 6 ta belgidan iborat bo‘lsin."}), 400
     if current_password == new_password:
         return jsonify({"error": "Yangi parol joriy paroldan farq qilishi kerak."}), 400
 
